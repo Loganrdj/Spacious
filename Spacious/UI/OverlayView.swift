@@ -37,7 +37,8 @@ struct OverlayView: View {
 
             ForEach(grid.zones) { zone in
                 let rect = GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: size, gap: model.gap)
-                ZoneTile(zone: zone, highlighted: zone.id == state.highlightedZoneID, large: true)
+                ZoneTile(zone: zone, highlighted: zone.id == state.highlightedZoneID, large: true,
+                         tooSmall: model.display(id: displayID).map { model.zoneIsTooSmall(zone, in: grid, on: $0) } ?? false)
                     .frame(width: rect.width, height: rect.height)
                     .offset(x: rect.minX, y: rect.minY)
             }
@@ -128,6 +129,8 @@ struct ZoneTile: View {
     var highlighted = false
     var selected = false
     var large = false
+    /// An assigned app can't shrink to this zone's size.
+    var tooSmall = false
 
     var body: some View {
         let tint = zone.color.color
@@ -139,6 +142,16 @@ struct ZoneTile: View {
                     .strokeBorder(selected ? Color.primary : tint.opacity(highlighted ? 1 : 0.8), lineWidth: selected || highlighted ? (large ? 4 : 2) : 1)
             )
             .overlay(label.padding(large ? 12 : 2))
+            .overlay(alignment: .topTrailing) {
+                if tooSmall {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: large ? 22 : 10))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.black, .yellow)
+                        .padding(large ? 10 : 3)
+                        .help("Too small for an assigned app's minimum window size")
+                }
+            }
     }
 
     @ViewBuilder

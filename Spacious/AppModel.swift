@@ -235,6 +235,66 @@ final class AppModel {
         return Coordinates.axRect(fromLocal: local, in: visible, primaryScreenHeight: DisplayManager.primaryScreenHeight)
     }
 
+    // MARK: Window placement & minimum sizes
+
+    /// Moves a window into `cells`. Apps can refuse to shrink below their own
+    /// minimum size; when that happens the size it actually took is learned
+    /// and the window is centered on the zone, kept fully on its monitor.
+    /// Returns false if the window didn't fit the zone.
+    @discardableResult
+    func place(_ window: AXUIElement, cells: CellRect, in grid: MonitorGrid, on display: DisplayInfo) -> Bool {
+        let target = axFrame(for: cells, in: grid, on: display)
+        AccessibilityService.setFrame(target, of: window)
+        guard let actual = AccessibilityService.frame(of: window) else { return true }
+
+        if let bundleID = bundleID(of: window), AccessibilityService.isResizable(window) {
+            learnMinimumSize(bundleID, requested: target.size, actual: actual.size)
+        }
+
+        let bounds = Coordinates.flip(display.visibleFrame, primaryScreenHeight: DisplayManager.primaryScreenHeight)
+            .insetBy(dx: gap / 2, dy: gap / 2)
+        let placed = ZoneFitting.place(windowSize: actual.size, in: target, bounds: bounds)
+        if abs(placed.minX - actual.minX) > 1 || abs(placed.minY - actual.minY) > 1 {
+            AccessibilityService.setPosition(placed.origin, of: window)
+        }
+        return actual.width <= target.width + ZoneFitting.tolerance && actual.height <= target.height + ZoneFitting.tolerance
+    }
+
+    private func bundleID(of window: AXUIElement) -> String? {
+        AccessibilityService.pid(of: window).flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+    }
+
+    private func learnMinimumSize(_ bundleID: String, requested: CGSize, actual: CGSize) {
+        let previous = document.appMinimumSizes[bundleID]
+        let learned = ZoneFitting.learnedMinimum(previous: previous, requested: requested, actual: actual)
+        if learned != previous { document.appMinimumSizes[bundleID] = learned }
+    }
+
+    /// Measures a running app's minimum window size (used right after the app
+    /// is assigned to a zone, so warnings show before the first Apply).
+    func measureMinimumSize(of bundleID: String) {
+        guard isAccessibilityTrusted,
+              let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
+              let window = AccessibilityService.windows(of: app.processIdentifier).first(where: AccessibilityService.isResizable),
+              let size = AccessibilityService.measureMinimumSize(of: window) else { return }
+        document.appMinimumSizes[bundleID] = Size2D(width: size.width, height: size.height)
+    }
+
+    func minimumSize(of bundleID: String) -> Size2D? {
+        document.appMinimumSizes[bundleID]
+    }
+
+    /// The problem, if any, with fitting `app` into `cells` on a display.
+    func fitIssue(for app: AppRef, cells: CellRect, in grid: MonitorGrid, on display: DisplayInfo) -> ZoneFitIssue? {
+        guard let minimum = minimumSize(of: app.bundleID) else { return nil }
+        return ZoneFitting.check(cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size, gap: gap, minimum: minimum)
+    }
+
+    /// True if any app assigned to the zone can't shrink to fit it.
+    func zoneIsTooSmall(_ zone: Zone, in grid: MonitorGrid, on display: DisplayInfo) -> Bool {
+        zone.apps.contains { fitIssue(for: $0, cells: zone.cells, in: grid, on: display) != nil }
+    }
+
     // MARK: Actions
 
     func applyActiveLayout() {

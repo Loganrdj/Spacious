@@ -55,11 +55,10 @@ final class DragSnapMonitor {
 
         case .leftMouseUp:
             if isMovingWindow, let window = candidate, let target, NSEvent.modifierFlags.contains(.shift) {
-                let frame = model.axFrame(for: target.zone.cells, in: target.grid, on: target.display)
                 // Give the system a moment to finish its own drag before resizing.
-                Task { @MainActor in
+                Task { @MainActor [model] in
                     try? await Task.sleep(for: .milliseconds(60))
-                    AccessibilityService.setFrame(frame, of: window)
+                    model.place(window, cells: target.zone.cells, in: target.grid, on: target.display)
                 }
             }
             if model.overlay.isVisible && !model.overlay.state.interactive { model.overlay.hide() }

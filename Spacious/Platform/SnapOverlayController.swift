@@ -60,7 +60,7 @@ final class SnapOverlayController {
             return hide()
         }
         hide()
-        AccessibilityService.setFrame(model.axFrame(for: cells, in: grid, on: display), of: window)
+        model.place(window, cells: cells, in: grid, on: display)
         AccessibilityService.raise(window)
     }
 

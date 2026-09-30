@@ -159,7 +159,8 @@ private struct GridCanvas: View {
 
             ForEach(grid.zones) { zone in
                 let r = GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: size, gap: gap)
-                ZoneTile(zone: zone, selected: zone.id == model.selectedZoneID)
+                ZoneTile(zone: zone, selected: zone.id == model.selectedZoneID,
+                         tooSmall: model.zoneIsTooSmall(zone, in: grid, on: display))
                     .frame(width: r.width, height: r.height)
                     .offset(x: r.minX, y: r.minY)
             }

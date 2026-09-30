@@ -217,12 +217,28 @@ public struct SpaciousDocument: Codable, Hashable, Sendable {
     public var layouts: [Layout]
     public var activeLayoutID: UUID?
     public var settings: AppSettings
+    /// Learned minimum window sizes in points, keyed by bundle ID. Apps don't
+    /// publish these, so Spacious measures them (see `ZoneFitting`).
+    public var appMinimumSizes: [String: Size2D]
 
-    public init(layouts: [Layout] = [Layout(name: "Default")], activeLayoutID: UUID? = nil, settings: AppSettings = AppSettings()) {
+    public init(layouts: [Layout] = [Layout(name: "Default")], activeLayoutID: UUID? = nil, settings: AppSettings = AppSettings(),
+                appMinimumSizes: [String: Size2D] = [:]) {
         self.schemaVersion = Self.currentSchemaVersion
         self.layouts = layouts.isEmpty ? [Layout(name: "Default")] : layouts
         self.activeLayoutID = activeLayoutID ?? self.layouts.first?.id
         self.settings = settings
+        self.appMinimumSizes = appMinimumSizes
+    }
+
+    // Custom decoding so files saved before a field existed still load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? Self.currentSchemaVersion
+        let layouts = try c.decode([Layout].self, forKey: .layouts)
+        self.layouts = layouts.isEmpty ? [Layout(name: "Default")] : layouts
+        activeLayoutID = try c.decodeIfPresent(UUID.self, forKey: .activeLayoutID) ?? self.layouts.first?.id
+        settings = try c.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
+        appMinimumSizes = try c.decodeIfPresent([String: Size2D].self, forKey: .appMinimumSizes) ?? [:]
     }
 
     public var activeLayoutIndex: Int {

@@ -36,14 +36,20 @@ enum AccessibilityService {
         return attribute(appElement, kAXMainWindowAttribute)
     }
 
-    /// Standard, non-minimized windows of a process, front-most first.
+    /// Standard windows of a process that can be arranged (not minimized or
+    /// full screen), front-most first.
     static func windows(of pid: pid_t) -> [AXUIElement] {
         let appElement = AXUIElementCreateApplication(pid)
         let all: [AXUIElement] = attribute(appElement, kAXWindowsAttribute) ?? []
         return all.filter { window in
             let subrole: String? = attribute(window, kAXSubroleAttribute)
             let minimized: Bool = attribute(window, kAXMinimizedAttribute) ?? false
-            return (subrole == nil || subrole == kAXStandardWindowSubrole) && !minimized
+            let fullScreen: Bool = attribute(window, "AXFullScreen") ?? false
+            guard !minimized, !fullScreen else { return false }
+            if subrole == kAXStandardWindowSubrole { return true }
+            // Some apps don't report a subrole for real windows, but Finder's
+            // desktop doesn't either; only accept those if they can be resized.
+            return subrole == nil && isResizable(window)
         }
     }
 
@@ -82,9 +88,44 @@ enum AccessibilityService {
 
     /// Moves and resizes a window. Size is set between two position writes so
     /// moves across monitors of different sizes are not clamped by the old
-    /// screen. Apps using "enhanced UI" (Chrome, Electron) animate AX changes,
-    /// which breaks rapid writes, so that flag is disabled temporarily.
+    /// screen. The app may still refuse sizes below its own minimum.
     static func setFrame(_ rect: CGRect, of window: AXUIElement) {
+        withEnhancedUIDisabled(for: window) {
+            writePosition(rect.origin, of: window)
+            writeSize(rect.size, of: window)
+            writePosition(rect.origin, of: window)
+        }
+    }
+
+    /// Moves a window without resizing it.
+    static func setPosition(_ origin: CGPoint, of window: AXUIElement) {
+        withEnhancedUIDisabled(for: window) { writePosition(origin, of: window) }
+    }
+
+    static func isResizable(_ window: AXUIElement) -> Bool {
+        var settable: DarwinBoolean = false
+        return AXUIElementIsAttributeSettable(window, kAXSizeAttribute as CFString, &settable) == .success && settable.boolValue
+    }
+
+    /// Measures the smallest size a window allows. macOS has no API to read
+    /// another app's minimum window size, so this briefly asks the window to
+    /// shrink to 1×1, reads back where the app stopped it, and restores the
+    /// original frame. Returns nil for windows that can't be resized, since
+    /// they reveal nothing about the app's real limits.
+    static func measureMinimumSize(of window: AXUIElement) -> CGSize? {
+        guard isResizable(window), let original = frame(of: window) else { return nil }
+        return withEnhancedUIDisabled(for: window) {
+            writeSize(CGSize(width: 1, height: 1), of: window)
+            let measured = frame(of: window)?.size
+            writeSize(original.size, of: window)
+            writePosition(original.origin, of: window)
+            return measured
+        }
+    }
+
+    /// Apps using "enhanced UI" (Chrome, Electron) animate AX changes, which
+    /// breaks rapid writes, so the flag is switched off around `body`.
+    private static func withEnhancedUIDisabled<T>(for window: AXUIElement, _ body: () -> T) -> T {
         let appElement = pid(of: window).map(AXUIElementCreateApplication)
         let enhancedUI = "AXEnhancedUserInterface" as CFString
         var hadEnhancedUI = false
@@ -97,13 +138,19 @@ enum AccessibilityService {
                 AXUIElementSetAttributeValue(appElement, enhancedUI, kCFBooleanTrue)
             }
         }
+        return body()
+    }
 
-        var origin = rect.origin
-        var size = rect.size
-        guard let pos = AXValueCreate(.cgPoint, &origin), let sz = AXValueCreate(.cgSize, &size) else { return }
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, pos)
-        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sz)
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, pos)
+    private static func writePosition(_ origin: CGPoint, of window: AXUIElement) {
+        var origin = origin
+        guard let value = AXValueCreate(.cgPoint, &origin) else { return }
+        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, value)
+    }
+
+    private static func writeSize(_ size: CGSize, of window: AXUIElement) {
+        var size = size
+        guard let value = AXValueCreate(.cgSize, &size) else { return }
+        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, value)
     }
 
     /// Brings a window (and its app) to the front.

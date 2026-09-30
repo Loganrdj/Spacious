@@ -135,3 +135,65 @@ final class LayoutStoreTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: dir.path).count, 1)
     }
 }
+
+final class ZoneFittingTests: XCTestCase {
+    // A 1000×500 monitor with a 10×5 grid and no gap: each cell is 100×100.
+    let size = CGSize(width: 1000, height: 500)
+    let spotify = Size2D(width: 800, height: 600)
+
+    func testZoneLargeEnoughHasNoIssue() {
+        let issue = ZoneFitting.check(CellRect(col: 0, row: 0, width: 8, height: 6), columns: 10, rows: 10, in: CGSize(width: 1000, height: 1000), gap: 0, minimum: spotify)
+        XCTAssertNil(issue)
+    }
+
+    func testSmallZoneSuggestsGrowingRightAndDown() {
+        let issue = ZoneFitting.check(CellRect(col: 1, row: 1, width: 3, height: 3), columns: 10, rows: 10, in: CGSize(width: 1000, height: 1000), gap: 0, minimum: spotify)
+        XCTAssertEqual(issue?.zoneSize, CGSize(width: 300, height: 300))
+        XCTAssertEqual(issue?.suggestedCells, CellRect(col: 1, row: 1, width: 8, height: 6))
+    }
+
+    func testGrowShiftsLeftAtGridEdge() {
+        let grown = ZoneFitting.grow(CellRect(col: 8, row: 0, width: 2, height: 2), columns: 10, rows: 10, in: CGSize(width: 1000, height: 1000), gap: 0, toFit: spotify)
+        XCTAssertEqual(grown, CellRect(col: 2, row: 0, width: 8, height: 6))
+    }
+
+    func testAppTallerThanMonitorCannotFit() {
+        let issue = ZoneFitting.check(CellRect(col: 0, row: 0, width: 2, height: 2), columns: 10, rows: 5, in: size, gap: 0, minimum: spotify)
+        XCTAssertNotNil(issue)
+        XCTAssertFalse(issue!.fitsOnMonitor)
+    }
+
+    func testGapIsAccountedFor() {
+        // 8 cells of 100pt minus a 10pt gap is 790pt: not enough for 800pt.
+        let grown = ZoneFitting.grow(CellRect(col: 0, row: 0, width: 1, height: 1), columns: 10, rows: 10, in: CGSize(width: 1000, height: 1000), gap: 10, toFit: spotify)
+        XCTAssertEqual(grown?.width, 9)
+    }
+
+    func testOversizedWindowIsCenteredThenKeptOnScreen() {
+        let bounds = CGRect(x: 0, y: 0, width: 1000, height: 500)
+        let middle = ZoneFitting.place(windowSize: CGSize(width: 400, height: 200), in: CGRect(x: 400, y: 100, width: 200, height: 100), bounds: bounds)
+        XCTAssertEqual(middle, CGRect(x: 300, y: 50, width: 400, height: 200))
+        let corner = ZoneFitting.place(windowSize: CGSize(width: 400, height: 200), in: CGRect(x: 0, y: 0, width: 200, height: 100), bounds: bounds)
+        XCTAssertEqual(corner.origin, .zero)
+        let huge = ZoneFitting.place(windowSize: CGSize(width: 1200, height: 200), in: CGRect(x: 800, y: 0, width: 200, height: 100), bounds: bounds)
+        XCTAssertEqual(huge.minX, 0)
+    }
+
+    func testLearningMinimumSizes() {
+        // Width refused to shrink; height fit.
+        let first = ZoneFitting.learnedMinimum(previous: nil, requested: CGSize(width: 500, height: 900), actual: CGSize(width: 800, height: 900))
+        XCTAssertEqual(first, Size2D(width: 800, height: 0))
+        // Everything fit and nothing was known: still unknown.
+        XCTAssertNil(ZoneFitting.learnedMinimum(previous: nil, requested: CGSize(width: 500, height: 500), actual: CGSize(width: 500, height: 500)))
+        // A fit at 700 proves a stale 800 minimum is now at most 700.
+        let lowered = ZoneFitting.learnedMinimum(previous: Size2D(width: 800, height: 600), requested: CGSize(width: 700, height: 650), actual: CGSize(width: 700, height: 650))
+        XCTAssertEqual(lowered, Size2D(width: 700, height: 600))
+    }
+
+    func testOldDocumentsWithoutMinimumSizesStillLoad() throws {
+        let legacy = #"{"schemaVersion":1,"layouts":[{"id":"D46A611F-BA70-489A-93C7-64F8F98518F3","name":"Default","monitors":[],"launchMissingApps":false}],"activeLayoutID":"D46A611F-BA70-489A-93C7-64F8F98518F3","settings":{"gap":8,"shiftDragEnabled":true}}"#
+        let doc = try JSONDecoder().decode(SpaciousDocument.self, from: Data(legacy.utf8))
+        XCTAssertEqual(doc.appMinimumSizes, [:])
+        XCTAssertEqual(doc.layouts.first?.name, "Default")
+    }
+}

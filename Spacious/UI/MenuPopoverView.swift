@@ -114,7 +114,7 @@ struct MenuPopoverView: View {
             Divider()
             GridEditorView(model: model, display: display, grid: grid)
             if let zoneID = model.selectedZoneID, let zone = grid.zones.first(where: { $0.id == zoneID }) {
-                ZoneInspectorView(model: model, displayID: id, zone: zone)
+                ZoneInspectorView(model: model, display: display, grid: grid, zone: zone)
             }
         }
 

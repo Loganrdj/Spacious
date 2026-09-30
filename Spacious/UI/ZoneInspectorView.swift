@@ -4,10 +4,13 @@ import SpaciousCore
 /// Edit a zone's name, color, and assigned apps.
 struct ZoneInspectorView: View {
     let model: AppModel
-    let displayID: String
+    let display: DisplayInfo
+    let grid: MonitorGrid
     let zone: Zone
 
     @State private var name = ""
+
+    private var displayID: String { display.id }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -41,25 +44,14 @@ struct ZoneInspectorView: View {
                         .onTapGesture { model.updateZone(displayID, zone.id) { $0.color = color } }
                 }
                 Spacer()
-                Text("\(zone.cells.width)×\(zone.cells.height) cells")
+                Text("\(zone.cells.width)×\(zone.cells.height) cells · \(sizeText(zoneSize))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 ForEach(zone.apps) { app in
-                    HStack {
-                        AppIcon(bundleID: app.bundleID, size: 18)
-                        Text(app.name)
-                        Spacer()
-                        Button {
-                            model.updateZone(displayID, zone.id) { $0.apps.removeAll { $0.bundleID == app.bundleID } }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Remove \(app.name) from this zone")
-                    }
+                    appRow(app)
                 }
                 addAppMenu
             }
@@ -69,6 +61,72 @@ struct ZoneInspectorView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(zone.color.color.opacity(0.4)))
         .onAppear { name = zone.name }
         .onChange(of: zone.id) { name = zone.name }
+    }
+
+    @ViewBuilder
+    private func appRow(_ app: AppRef) -> some View {
+        let issue = model.fitIssue(for: app, cells: zone.cells, in: grid, on: display)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                AppIcon(bundleID: app.bundleID, size: 18)
+                Text(app.name)
+                if issue != nil {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.black, .yellow)
+                }
+                Spacer()
+                Button {
+                    model.updateZone(displayID, zone.id) { $0.apps.removeAll { $0.bundleID == app.bundleID } }
+                } label: {
+                    Image(systemName: "minus.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Remove \(app.name) from this zone")
+            }
+            if let issue {
+                fitWarning(app: app, issue: issue)
+            }
+        }
+    }
+
+    private func fitWarning(app: AppRef, issue: ZoneFitIssue) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(app.name) can't get smaller than \(sizeText(issue.minimum)).")
+                Text(issue.fitsOnMonitor
+                     ? "This zone is \(sizeText(issue.zoneSize)), so the window will overlap nearby zones."
+                     : "It doesn't fit on \(display.name) even at full size. Try another monitor.")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if let suggested = issue.suggestedCells {
+                Button("Grow zone to fit") {
+                    model.updateZone(displayID, zone.id) { $0.cells = suggested }
+                }
+                .controlSize(.small)
+                .help("Resize to \(suggested.width)×\(suggested.height) cells")
+            }
+        }
+        .padding(8)
+        .background(Color.yellow.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var zoneSize: CGSize {
+        GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size, gap: model.gap).size
+    }
+
+    private func sizeText(_ size: CGSize) -> String { "\(Int(size.width))×\(Int(size.height))" }
+
+    private func sizeText(_ size: Size2D) -> String {
+        // A 0 dimension means only the other dimension is known to be limited.
+        switch (size.width > 0, size.height > 0) {
+        case (true, true): "\(Int(size.width))×\(Int(size.height))"
+        case (true, false): "\(Int(size.width)) pt wide"
+        default: "\(Int(size.height)) pt tall"
+        }
     }
 
     private var addAppMenu: some View {
@@ -97,6 +155,9 @@ struct ZoneInspectorView: View {
         model.updateZone(displayID, zone.id) { zone in
             if !zone.apps.contains(where: { $0.bundleID == app.bundleID }) { zone.apps.append(app) }
         }
+        // Measure right away (running apps only) so a too-small zone is
+        // flagged now rather than after the first Apply.
+        model.measureMinimumSize(of: app.bundleID)
     }
 
     private func commitName() {
