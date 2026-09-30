@@ -1,0 +1,63 @@
+name: Spacious
+
+options:
+  bundleIdPrefix: com.loganrdj
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+packages:
+  SpaciousCore:
+    path: Packages/SpaciousCore
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.4.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Spacious:
+    type: application
+    platform: macOS
+    sources:
+      - path: Spacious
+    dependencies:
+      - package: SpaciousCore
+      - package: KeyboardShortcuts
+    info:
+      path: Spacious/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Spacious
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: Copyright © 2026 Logan Moss. MIT License.
+    entitlements:
+      path: Spacious/Resources/Spacious.entitlements
+      properties: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.loganrdj.spacious
+        PRODUCT_NAME: Spacious
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Development
+        DEVELOPMENT_TEAM: 434QVQFFXL
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: YES
+
+schemes:
+  Spacious:
+    build:
+      targets:
+        Spacious: all
+    run:
+      config: Debug
+    archive:
+      config: Release

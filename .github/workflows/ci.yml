@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Core unit tests
+        run: swift test --package-path Packages/SpaciousCore
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build app
+        run: |
+          xcodegen generate
+          xcodebuild -project Spacious.xcodeproj -scheme Spacious -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 5
