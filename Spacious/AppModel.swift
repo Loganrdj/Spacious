@@ -40,6 +40,7 @@ final class AppModel {
 
     /// Called once at launch.
     func start() {
+        AccessibilityService.configureTimeout()
         Hotkeys.register(model: self)
         dragMonitor.start()
         if !isAccessibilityTrusted {

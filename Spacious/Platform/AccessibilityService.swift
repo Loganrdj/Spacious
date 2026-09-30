@@ -7,6 +7,12 @@ import ApplicationServices
 enum AccessibilityService {
     static var isTrusted: Bool { AXIsProcessTrusted() }
 
+    /// Caps how long any AX call may block on an unresponsive app (the
+    /// system default is ~6s, which would freeze drag handling).
+    static func configureTimeout() {
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.3)
+    }
+
     /// Shows the system "allow accessibility" prompt if not yet trusted.
     @discardableResult
     static func requestTrust() -> Bool {
