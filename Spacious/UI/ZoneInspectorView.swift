@@ -10,6 +10,7 @@ struct ZoneInspectorView: View {
 
     @State private var name = ""
     @State private var showingPicker = false
+    @Environment(\.dismiss) private var dismiss
 
     private var displayID: String { display.id }
 
@@ -57,10 +58,20 @@ struct ZoneInspectorView: View {
                 if showingPicker {
                     AssignPicker(existing: zone.apps, onAdd: add, onClose: { showingPicker = false })
                 } else {
-                    Button {
-                        showingPicker = true
-                    } label: {
-                        Label(zone.apps.isEmpty ? "Assign an app, window, or website" : "Assign another", systemImage: "plus.app")
+                    HStack(spacing: 14) {
+                        Button {
+                            showingPicker = true
+                        } label: {
+                            Label(zone.apps.isEmpty ? "Assign…" : "Assign another…", systemImage: "plus.app")
+                        }
+                        Button {
+                            // Close the menu so it doesn't cover the windows, then pick.
+                            dismiss()
+                            model.pickWindow(forZone: zone.id, on: displayID)
+                        } label: {
+                            Label("Pick a window", systemImage: "scope")
+                        }
+                        .help("Point at any window and click it to put it in this zone")
                     }
                     .buttonStyle(.borderless)
                 }

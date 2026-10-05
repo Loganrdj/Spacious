@@ -116,6 +116,12 @@ enum AccessibilityService {
         return nil
     }
 
+    /// The system window number (as in CGWindowList) of an AX window.
+    static func windowNumber(of window: AXUIElement) -> CGWindowID? {
+        var id: CGWindowID = 0
+        return _AXUIElementGetWindow(window, &id) == .success && id != 0 ? id : nil
+    }
+
     static func pid(of element: AXUIElement) -> pid_t? {
         var pid: pid_t = 0
         return AXUIElementGetPid(element, &pid) == .success ? pid : nil
@@ -246,3 +252,9 @@ enum AccessibilityService {
         return value as? T
     }
 }
+
+/// Private but long-stable HIServices function mapping an AX window to its
+/// CGWindowID; window managers outside the App Store rely on it. Used to
+/// tell apart windows that share the exact same frame.
+@_silgen_name("_AXUIElementGetWindow")
+private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePointer<CGWindowID>) -> AXError

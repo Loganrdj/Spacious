@@ -118,6 +118,35 @@ enum BrowserBridge {
         }
     }
 
+    /// The URL of the tab showing in the browser window at `frame` (AX
+    /// coordinates), e.g. a window picked with the window picker.
+    static func activeTabURL(in browser: Browser, windowFrame frame: CGRect) throws -> String? {
+        guard pid(of: browser) != nil else { return nil }
+        let activeTab = browser.flavor == .safari ? "current tab" : "active tab"
+        let output = try run("""
+            tell application id "\(browser.bundleID)"
+                set RS to character id 30
+                set US to character id 31
+                set out to ""
+                repeat with w in windows
+                    try
+                        set b to bounds of w
+                        set out to out & (item 1 of b as text) & US & (item 2 of b as text) & US & (item 3 of b as text) & US & (item 4 of b as text) & US & (URL of \(activeTab) of w) & RS
+                    end try
+                end repeat
+                return out
+            end tell
+            """, browser: browser)
+        for record in output.split(separator: "\u{1E}") {
+            let f = record.split(separator: "\u{1F}", omittingEmptySubsequences: false).map(String.init)
+            guard f.count >= 5, let l = Double(f[0]), let t = Double(f[1]), let r = Double(f[2]), let b = Double(f[3]) else { continue }
+            if abs(l - frame.minX) <= 2, abs(t - frame.minY) <= 2, abs((r - l) - frame.width) <= 2, abs((b - t) - frame.height) <= 2 {
+                return f[4].isEmpty ? nil : f[4]
+            }
+        }
+        return nil
+    }
+
     // MARK: Giving a website its own window
 
     /// Finds the tab matching `pattern` (or opens it), makes sure it is alone

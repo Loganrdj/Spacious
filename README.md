@@ -14,6 +14,7 @@ The app runs entirely on your Mac, with no accounts, no backend, and no network.
   - **App**: all of its windows. If an app is assigned to several zones, its windows are spread across them.
   - **Window**: one specific window, matched by its title (for example, a Notes window titled "Groceries").
   - **Website**: a browser tab such as `mail.google.com`. On Apply, Spacious moves the tab into a window of its own, keeping the page intact, and places that window. If the site isn't open, Spacious opens it. Works with Chrome, Safari, Edge, Brave, and Vivaldi. Firefox doesn't let other apps read its tabs.
+- **Pick a window**: like a browser's element inspector. Choose *Pick a window* on a zone, point at any window to highlight it, and click to put it in that zone. A browser window is remembered by its website; ⌥-click assigns the whole app.
 - **Minimum window sizes**: some apps (Spotify, for example) can't shrink below a certain size. Spacious measures this, marks zones that are too small with ⚠︎, and offers *Grow zone to fit*.
 - **Launch All**: one click opens every app and website in the layout and cascades each window into its zone as soon as it appears. Set *When Spacious opens → Launch all* and turn on *Open at login*, and your Mac sets itself up after every restart.
 - **Smooth cascade**: windows glide into place one after another. The speed is adjustable, or animation can be turned off.

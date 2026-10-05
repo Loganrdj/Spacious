@@ -26,6 +26,7 @@ final class AppModel {
     @ObservationIgnored let displayManager = DisplayManager()
     @ObservationIgnored private(set) lazy var overlay = SnapOverlayController(model: self)
     @ObservationIgnored private lazy var dragMonitor = DragSnapMonitor(model: self)
+    @ObservationIgnored private let windowPicker = WindowPicker()
     @ObservationIgnored private let store: LayoutStore
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var trustTimer: Timer?
@@ -356,6 +357,46 @@ final class AppModel {
             let result = await LayoutApplier.apply(layout, model: self, launchMissing: launch)
             statusMessage = result.summary
             isApplying = false
+        }
+    }
+
+    /// Starts the inspector-style picker: the next window clicked is added
+    /// to the zone and glides into it.
+    func pickWindow(forZone zoneID: UUID, on displayID: String) {
+        guard isAccessibilityTrusted else { return requestAccessibility() }
+        windowPicker.start { [weak self] picked in
+            self?.assignPicked(picked, toZone: zoneID, on: displayID)
+        }
+    }
+
+    private func assignPicked(_ picked: PickedWindow, toZone zoneID: UUID, on displayID: String) {
+        guard let app = NSRunningApplication(processIdentifier: picked.pid), let bundleID = app.bundleIdentifier,
+              let display = display(id: displayID), let grid = grid(for: displayID),
+              let zone = grid.zones.first(where: { $0.id == zoneID }) else { return }
+        let name = app.localizedName ?? bundleID
+
+        // Browsers: a window's title changes with every tab switch, so the
+        // website showing in it is a better thing to remember.
+        var ref = AppRef(bundleID: bundleID, name: name)
+        if !picked.wholeApp {
+            if let browser = BrowserBridge.browser(for: bundleID),
+               let url = try? BrowserBridge.activeTabURL(in: browser, windowFrame: picked.frame) {
+                ref = AppRef(bundleID: bundleID, name: name, url: TargetMatching.suggestedPattern(for: url))
+            } else {
+                let title = AccessibilityService.title(of: picked.window)
+                if !title.isEmpty { ref = AppRef(bundleID: bundleID, name: name, windowTitle: title) }
+            }
+        }
+
+        updateZone(displayID, zoneID) { zone in
+            if !zone.apps.contains(where: { $0.id == ref.id }) { zone.apps.append(ref) }
+        }
+        selectedDisplayID = displayID
+        selectedZoneID = zoneID
+        measureMinimumSize(of: bundleID)
+        statusMessage = "Added \(ref.label) to \(zone.name.isEmpty ? "the zone" : "“\(zone.name)”")"
+        Task {
+            await arrange(WindowMove(window: picked.window, cells: zone.cells, grid: grid, display: display))
         }
     }
 
