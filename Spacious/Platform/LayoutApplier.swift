@@ -187,7 +187,7 @@ enum LayoutApplier {
                     continue
                 }
                 do {
-                    if let found = try await BrowserBridge.isolatedWindow(for: pattern, in: browser, skipping: usedURLs) {
+                    if let found = try await BrowserBridge.isolatedWindow(for: pattern, in: browser, skipping: usedURLs, claimed: claimed) {
                         usedURLs.insert(found.url)
                         await send(found.window, assignment)
                     } else {

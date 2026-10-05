@@ -36,7 +36,7 @@ struct OverlayView: View {
             }
 
             ForEach(grid.zones) { zone in
-                let rect = GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: size, gap: model.gap)
+                let rect = GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: size, gap: AppModel.previewGap)
                 ZoneTile(zone: zone, highlighted: zone.id == state.highlightedZoneID, large: true,
                          tooSmall: model.display(id: displayID).map { model.zoneIsTooSmall(zone, in: grid, on: $0) } ?? false)
                     .frame(width: rect.width, height: rect.height)
@@ -44,7 +44,7 @@ struct OverlayView: View {
             }
 
             if let selection = state.selection, selection.displayID == displayID {
-                let rect = GridMath.frame(for: selection.cells, columns: grid.columns, rows: grid.rows, in: size, gap: model.gap)
+                let rect = GridMath.frame(for: selection.cells, columns: grid.columns, rows: grid.rows, in: size, gap: AppModel.previewGap)
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.accentColor.opacity(0.35))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white, style: StrokeStyle(lineWidth: 3, dash: [10, 6])))

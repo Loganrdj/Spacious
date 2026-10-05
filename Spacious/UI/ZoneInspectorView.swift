@@ -165,7 +165,7 @@ struct ZoneInspectorView: View {
     }
 
     private var zoneSize: CGSize {
-        GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size, gap: model.gap).size
+        GridMath.frame(for: zone.cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size).size
     }
 
     private func sizeText(_ size: CGSize) -> String { "\(Int(size.width))×\(Int(size.height))" }

@@ -10,15 +10,21 @@ final class GridMathTests: XCTestCase {
         XCTAssertEqual(frame, CGRect(x: 0, y: 0, width: 1000, height: 1000))
     }
 
-    func testGapAppliesToOuterEdgesAndBetweenZones() {
+    func testGapIsOnlyBetweenZonesSoWindowsSitFlush() {
         let gap: CGFloat = 10
         let left = GridMath.frame(for: CellRect(col: 0, row: 0, width: 1, height: 1), columns: 2, rows: 1, in: size, gap: gap)
         let right = GridMath.frame(for: CellRect(col: 1, row: 0, width: 1, height: 1), columns: 2, rows: 1, in: size, gap: gap)
-        XCTAssertEqual(left.minX, 10)
-        XCTAssertEqual(left.minY, 10)
-        XCTAssertEqual(right.maxX, 1990)
-        XCTAssertEqual(right.maxY, 990)
+        XCTAssertEqual(left, CGRect(x: 0, y: 0, width: 995, height: 1000))
+        XCTAssertEqual(right, CGRect(x: 1005, y: 0, width: 995, height: 1000))
         XCTAssertEqual(right.minX - left.maxX, 10)
+        // A single full-screen zone is exactly the screen.
+        XCTAssertEqual(GridMath.frame(for: CellRect(col: 0, row: 0, width: 2, height: 1), columns: 2, rows: 1, in: size, gap: gap),
+                       CGRect(origin: .zero, size: size))
+    }
+
+    func testMarginInsetsTheScreenEdges() {
+        let frame = GridMath.frame(for: CellRect(col: 0, row: 0, width: 1, height: 1), columns: 1, rows: 1, in: size, gap: 10, margin: 6)
+        XCTAssertEqual(frame, CGRect(x: 6, y: 6, width: 1988, height: 988))
     }
 
     func testCellHitTestingClampsToGrid() {
@@ -113,7 +119,7 @@ final class LayoutStoreTests: XCTestCase {
                         apps: [AppRef(bundleID: "com.google.Chrome", name: "Google Chrome")])
         let grid = MonitorGrid(displayID: "UUID-1", displayName: "Wide", lastKnownSize: Size2D(width: 3440, height: 1440),
                                columns: 20, rows: 10, zones: [zone])
-        let doc = SpaciousDocument(layouts: [Layout(name: "Work", monitors: [grid])], settings: AppSettings(gap: 12, shiftDragEnabled: false))
+        let doc = SpaciousDocument(layouts: [Layout(name: "Work", monitors: [grid])], settings: AppSettings(shiftDragEnabled: false, startupAction: .launchAll))
         try store.save(doc)
         XCTAssertEqual(store.load(), doc)
     }
@@ -164,7 +170,7 @@ final class ZoneFittingTests: XCTestCase {
     }
 
     func testGapIsAccountedFor() {
-        // 8 cells of 100pt minus a 10pt gap is 790pt: not enough for 800pt.
+        // 8 cells of 100pt, minus half a 10pt gap on the inner side, is 795pt: not enough for 800pt.
         let grown = ZoneFitting.grow(CellRect(col: 0, row: 0, width: 1, height: 1), columns: 10, rows: 10, in: CGSize(width: 1000, height: 1000), gap: 10, toFit: spotify)
         XCTAssertEqual(grown?.width, 9)
     }
@@ -196,7 +202,7 @@ final class ZoneFittingTests: XCTestCase {
         XCTAssertEqual(doc.appMinimumSizes, [:])
         XCTAssertEqual(doc.layouts.first?.name, "Default")
         XCTAssertEqual(doc.settings.startupAction, .nothing)
-        XCTAssertEqual(doc.settings.gap, 8)
+        XCTAssertTrue(doc.settings.shiftDragEnabled)
     }
 }
 

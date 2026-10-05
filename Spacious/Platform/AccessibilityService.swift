@@ -70,6 +70,11 @@ enum AccessibilityService {
         try? await Task.sleep(for: .milliseconds(400)) // let the exit animation settle
     }
 
+    /// The app's main (front-most document) window.
+    static func mainWindow(of pid: pid_t) -> AXUIElement? {
+        attribute(AXUIElementCreateApplication(pid), kAXMainWindowAttribute)
+    }
+
     static func title(of window: AXUIElement) -> String {
         attribute(window, kAXTitleAttribute) ?? ""
     }

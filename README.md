@@ -20,7 +20,7 @@ The app runs entirely on your Mac, with no accounts, no backend, and no network.
 - **Multiple layouts**: for example "Coding" and "Meeting". Switch and apply from the menu or with a hotkey.
 - **Snap any window**: press <kbd>⌃⌥Space</kbd>, then click a zone or drag across cells.
 - **Shift-drag**: hold <kbd>Shift</kbd> while dragging a window to see the zones, then drop it into one.
-- Adjustable gaps, custom hotkeys, launch at login, and an option to open assigned apps that aren't running.
+- Windows tile edge to edge, flush with the screen. Custom hotkeys, launch at login, and an option to open assigned apps that aren't running.
 - Remembers grids for monitors that are unplugged and uses them again when the monitor comes back.
 
 ## Install

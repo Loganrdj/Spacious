@@ -8,12 +8,6 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             group("Snapping") {
-                HStack {
-                    Text("Gap between windows")
-                    Spacer()
-                    Text("\(Int(model.document.settings.gap)) pt").monospacedDigit().foregroundStyle(.secondary)
-                }
-                Slider(value: $model.document.settings.gap, in: 0...32, step: 2)
                 Toggle("Hold Shift while dragging a window to snap it into a zone", isOn: $model.document.settings.shiftDragEnabled)
                 HStack {
                     Text("Window animation")

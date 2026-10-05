@@ -7,20 +7,33 @@ import CoreGraphics
 /// space: (0, 0) is the top-left corner of the monitor's usable area and y
 /// grows downward. `Coordinates` converts to and from OS screen spaces.
 public enum GridMath {
-    /// The frame of `cells` inside a container of `size`, with `gap` points
-    /// between neighbouring zones and around the outer edge.
-    public static func frame(for cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat = 0) -> CGRect {
-        let half = max(gap, 0) / 2
-        let inner = CGRect(origin: .zero, size: size).insetBy(dx: half, dy: half)
-        let cellW = inner.width / CGFloat(max(columns, 1))
-        let cellH = inner.height / CGFloat(max(rows, 1))
+    /// The frame of `cells` inside a container of `size`.
+    ///
+    /// - `gap`: space between neighbouring zones. Zone edges on the outside of
+    ///   the grid get none, so windows sit flush with the screen edges.
+    /// - `margin`: optional space around the whole grid (screen edges).
+    public static func frame(for cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat = 0, margin: CGFloat = 0) -> CGRect {
+        let container = CGRect(origin: .zero, size: size).insetBy(dx: max(margin, 0), dy: max(margin, 0))
+        let cellW = container.width / CGFloat(max(columns, 1))
+        let cellH = container.height / CGFloat(max(rows, 1))
         let raw = CGRect(
-            x: inner.minX + CGFloat(cells.col) * cellW,
-            y: inner.minY + CGFloat(cells.row) * cellH,
+            x: container.minX + CGFloat(cells.col) * cellW,
+            y: container.minY + CGFloat(cells.row) * cellH,
             width: CGFloat(cells.width) * cellW,
             height: CGFloat(cells.height) * cellH
         )
-        return raw.insetBy(dx: half, dy: half).integral
+        // Half the gap on each side that faces another cell.
+        let half = max(gap, 0) / 2
+        let left = cells.col > 0 ? half : 0
+        let top = cells.row > 0 ? half : 0
+        let right = cells.col + cells.width < columns ? half : 0
+        let bottom = cells.row + cells.height < rows ? half : 0
+        return CGRect(
+            x: raw.minX + left,
+            y: raw.minY + top,
+            width: raw.width - left - right,
+            height: raw.height - top - bottom
+        ).integral
     }
 
     /// The cell under a local point, clamped to the grid so drags that leave

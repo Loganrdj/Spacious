@@ -122,13 +122,16 @@ enum BrowserBridge {
 
     /// Finds the tab matching `pattern` (or opens it), makes sure it is alone
     /// in its window, and returns that window. Tabs whose URL is in `used`
-    /// are skipped, so two zones can each get their own copy of a site.
-    static func isolatedWindow(for pattern: String, in browser: Browser, skipping used: Set<String>) async throws -> (window: AXUIElement, url: String)? {
+    /// are skipped, so two zones can each get their own copy of a site, and
+    /// windows in `claimed` (already placed) are never returned.
+    static func isolatedWindow(for pattern: String, in browser: Browser, skipping used: Set<String>,
+                               claimed: [AXUIElement]) async throws -> (window: AXUIElement, url: String)? {
         guard let pid = pid(of: browser) else { return nil }
         let matches = try tabs(in: browser).filter { TargetMatching.url($0.url, matches: pattern) && !used.contains($0.url) }
         // Prefer a tab that already has a window to itself: nothing to move.
         let match = matches.first { $0.tabCount == 1 } ?? matches.first
         let url: String
+        var expectedTitle = match?.title
 
         if let match {
             url = match.url
@@ -156,12 +159,15 @@ enum BrowserBridge {
             try? await Task.sleep(for: .milliseconds(100))
             guard let front = try? frontWindow(of: browser) else { continue }
             lastFrame = front.frame
+            if expectedTitle == nil || expectedTitle?.isEmpty == true { expectedTitle = front.title }
             if front.tabCount == 1, TargetMatching.url(front.url, matches: pattern) || front.url == url,
-               let window = axWindow(of: pid, frame: front.frame) {
+               let window = axWindow(of: pid, frame: front.frame, title: expectedTitle, claimed: claimed) {
                 return (window, url)
             }
         }
-        if let lastFrame, let window = axWindow(of: pid, frame: lastFrame) { return (window, url) }
+        if let lastFrame, let window = axWindow(of: pid, frame: lastFrame, title: expectedTitle, claimed: claimed) {
+            return (window, url)
+        }
         return nil
     }
 
@@ -209,37 +215,55 @@ enum BrowserBridge {
         let frame: CGRect
         let tabCount: Int
         let url: String
+        let title: String
     }
 
     /// Frame (AX coordinates), tab count, and active URL of the front window.
     private static func frontWindow(of browser: Browser) throws -> FrontWindow? {
         let activeTab = browser.flavor == .safari ? "current tab" : "active tab"
+        let titleProperty = browser.flavor == .safari ? "name" : "title"
         let output = try run("""
             tell application id "\(browser.bundleID)"
                 set US to character id 31
                 set w to window 1
                 set b to bounds of w
                 set u to ""
+                set tt to ""
                 try
                     set u to URL of \(activeTab) of w
+                    set tt to \(titleProperty) of \(activeTab) of w
                 end try
-                return (item 1 of b as text) & US & (item 2 of b as text) & US & (item 3 of b as text) & US & (item 4 of b as text) & US & (count of tabs of w) & US & u
+                return (item 1 of b as text) & US & (item 2 of b as text) & US & (item 3 of b as text) & US & (item 4 of b as text) & US & (count of tabs of w) & US & u & US & tt
             end tell
             """, browser: browser)
         let f = output.split(separator: "\u{1F}", omittingEmptySubsequences: false).map(String.init)
         guard f.count >= 6, let l = Double(f[0]), let t = Double(f[1]), let r = Double(f[2]), let b = Double(f[3]),
               let n = Int(f[4]) else { return nil }
-        return FrontWindow(frame: CGRect(x: l, y: t, width: r - l, height: b - t), tabCount: n, url: f[5])
+        return FrontWindow(frame: CGRect(x: l, y: t, width: r - l, height: b - t), tabCount: n, url: f[5],
+                           title: f.count > 6 ? f[6] : "")
     }
 
-    /// The AX window of `pid` whose frame matches `frame` (AppleScript
-    /// bounds and AX share top-left global coordinates).
-    private static func axWindow(of pid: pid_t, frame: CGRect) -> AXUIElement? {
-        AccessibilityService.windows(of: pid, includeFullScreen: true).first { window in
-            guard let f = AccessibilityService.frame(of: window) else { return false }
+    /// The AX window that is the browser's front window. A tab moved into a
+    /// new window usually opens at the *same* frame as the window it came
+    /// from, so the frame alone is ambiguous. In order of preference:
+    /// the app's main window, a window titled like the tab, any other window
+    /// with that frame. Windows already placed are never returned.
+    private static func axWindow(of pid: pid_t, frame: CGRect, title: String?, claimed: [AXUIElement]) -> AXUIElement? {
+        func isClaimed(_ w: AXUIElement) -> Bool { claimed.contains { CFEqual($0, w) } }
+        func sameFrame(_ w: AXUIElement) -> Bool {
+            guard let f = AccessibilityService.frame(of: w) else { return false }
             return abs(f.minX - frame.minX) <= 2 && abs(f.minY - frame.minY) <= 2
                 && abs(f.width - frame.width) <= 2 && abs(f.height - frame.height) <= 2
         }
+        let candidates = AccessibilityService.windows(of: pid, includeFullScreen: true).filter { !isClaimed($0) && sameFrame($0) }
+        if let main = AccessibilityService.mainWindow(of: pid), candidates.contains(where: { CFEqual($0, main) }) {
+            return main
+        }
+        if let title, !title.isEmpty,
+           let titled = candidates.first(where: { AccessibilityService.title(of: $0).localizedCaseInsensitiveContains(title) }) {
+            return titled
+        }
+        return candidates.first
     }
 
     private static func appleScriptString(_ s: String) -> String {

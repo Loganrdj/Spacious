@@ -238,15 +238,12 @@ public enum StartupAction: String, Codable, CaseIterable, Sendable {
 }
 
 public struct AppSettings: Codable, Hashable, Sendable {
-    /// Space in points between zones and around screen edges.
-    public var gap: Double
     public var shiftDragEnabled: Bool
     public var startupAction: StartupAction
     /// How long windows take to glide into their zones, in seconds (0 = off).
     public var animationDuration: Double
 
-    public init(gap: Double = 8, shiftDragEnabled: Bool = true, startupAction: StartupAction = .nothing, animationDuration: Double = 0.35) {
-        self.gap = gap
+    public init(shiftDragEnabled: Bool = true, startupAction: StartupAction = .nothing, animationDuration: Double = 0.35) {
         self.shiftDragEnabled = shiftDragEnabled
         self.startupAction = startupAction
         self.animationDuration = animationDuration
@@ -255,7 +252,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
     // Custom decoding so settings saved before a field existed still load.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        gap = try c.decodeIfPresent(Double.self, forKey: .gap) ?? 8
         shiftDragEnabled = try c.decodeIfPresent(Bool.self, forKey: .shiftDragEnabled) ?? true
         startupAction = try c.decodeIfPresent(StartupAction.self, forKey: .startupAction) ?? .nothing
         animationDuration = try c.decodeIfPresent(Double.self, forKey: .animationDuration) ?? 0.35

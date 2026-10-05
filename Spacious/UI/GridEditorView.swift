@@ -149,7 +149,7 @@ private struct GridCanvas: View {
         let visible = display.visibleFrame.size
         let scale = min(maxSize.width / visible.width, maxSize.height / visible.height)
         let size = CGSize(width: (visible.width * scale).rounded(), height: (visible.height * scale).rounded())
-        let gap = max(2, model.gap * scale)
+        let gap: CGFloat = 2
 
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 6)

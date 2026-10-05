@@ -26,29 +26,32 @@ public enum ZoneFitting {
     public static let tolerance: CGFloat = 2
 
     /// Returns an issue if a window with `minimum` size can't shrink to `cells`.
-    public static func check(_ cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat, minimum: Size2D) -> ZoneFitIssue? {
-        let zone = GridMath.frame(for: cells, columns: columns, rows: rows, in: size, gap: gap)
+    public static func check(_ cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat, margin: CGFloat = 0, minimum: Size2D) -> ZoneFitIssue? {
+        let zone = GridMath.frame(for: cells, columns: columns, rows: rows, in: size, gap: gap, margin: margin)
         guard CGFloat(minimum.width) > zone.width + tolerance || CGFloat(minimum.height) > zone.height + tolerance else {
             return nil
         }
         return ZoneFitIssue(
             zoneSize: zone.size,
             minimum: minimum,
-            suggestedCells: grow(cells, columns: columns, rows: rows, in: size, gap: gap, toFit: minimum)
+            suggestedCells: grow(cells, columns: columns, rows: rows, in: size, gap: gap, margin: margin, toFit: minimum)
         )
     }
 
     /// The smallest rect containing `cells` that is large enough for
     /// `minimum`, grown right/down and shifted left/up at the grid edges.
-    public static func grow(_ cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat, toFit minimum: Size2D) -> CellRect? {
-        func span(current: Int, total: Int, needed: Double, length: (Int) -> CGFloat) -> Int? {
-            (current...max(current, total)).first { length($0) + tolerance >= CGFloat(needed) }
+    public static func grow(_ cells: CellRect, columns: Int, rows: Int, in size: CGSize, gap: CGFloat, margin: CGFloat = 0, toFit minimum: Size2D) -> CellRect? {
+        // Each candidate span is measured where it would actually sit, since
+        // zones on the grid's outer edge don't lose space to the gap.
+        func frame(col: Int, row: Int, width: Int, height: Int) -> CGRect {
+            GridMath.frame(for: CellRect(col: col, row: row, width: width, height: height),
+                           columns: columns, rows: rows, in: size, gap: gap, margin: margin)
         }
-        let width = span(current: cells.width, total: columns, needed: minimum.width) { n in
-            GridMath.frame(for: CellRect(col: 0, row: 0, width: n, height: 1), columns: columns, rows: rows, in: size, gap: gap).width
+        let width = (cells.width...max(cells.width, columns)).first { n in
+            frame(col: min(cells.col, columns - n), row: cells.row, width: n, height: 1).width + tolerance >= CGFloat(minimum.width)
         }
-        let height = span(current: cells.height, total: rows, needed: minimum.height) { n in
-            GridMath.frame(for: CellRect(col: 0, row: 0, width: 1, height: n), columns: columns, rows: rows, in: size, gap: gap).height
+        let height = (cells.height...max(cells.height, rows)).first { n in
+            frame(col: cells.col, row: min(cells.row, rows - n), width: 1, height: n).height + tolerance >= CGFloat(minimum.height)
         }
         guard let width, let height else { return nil }
         return CellRect(

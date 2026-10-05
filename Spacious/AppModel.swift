@@ -245,7 +245,7 @@ final class AppModel {
     /// The Accessibility-space frame a zone covers on a connected display.
     func axFrame(for cells: CellRect, in grid: MonitorGrid, on display: DisplayInfo) -> CGRect {
         let visible = display.visibleFrame
-        let local = GridMath.frame(for: cells, columns: grid.columns, rows: grid.rows, in: visible.size, gap: gap)
+        let local = GridMath.frame(for: cells, columns: grid.columns, rows: grid.rows, in: visible.size)
         return Coordinates.axRect(fromLocal: local, in: visible, primaryScreenHeight: DisplayManager.primaryScreenHeight)
     }
 
@@ -293,10 +293,9 @@ final class AppModel {
         return ZoneFitting.place(windowSize: size, in: target, bounds: axBounds(of: move.display))
     }
 
-    /// A display's usable area in AX coordinates, inset by the outer gap.
+    /// A display's usable area in AX coordinates.
     private func axBounds(of display: DisplayInfo) -> CGRect {
         Coordinates.flip(display.visibleFrame, primaryScreenHeight: DisplayManager.primaryScreenHeight)
-            .insetBy(dx: gap / 2, dy: gap / 2)
     }
 
     private func bundleID(of window: AXUIElement) -> String? {
@@ -326,7 +325,7 @@ final class AppModel {
     /// The problem, if any, with fitting `app` into `cells` on a display.
     func fitIssue(for app: AppRef, cells: CellRect, in grid: MonitorGrid, on display: DisplayInfo) -> ZoneFitIssue? {
         guard let minimum = minimumSize(of: app.bundleID) else { return nil }
-        return ZoneFitting.check(cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size, gap: gap, minimum: minimum)
+        return ZoneFitting.check(cells, columns: grid.columns, rows: grid.rows, in: display.visibleFrame.size, gap: 0, minimum: minimum)
     }
 
     /// True if any app assigned to the zone can't shrink to fit it.
@@ -371,7 +370,9 @@ final class AppModel {
 
     // MARK: Settings
 
-    var gap: CGFloat { CGFloat(document.settings.gap) }
+    /// Space drawn between zones in previews so neighbours stay distinct.
+    /// Real windows tile edge to edge.
+    static let previewGap: CGFloat = 4
 
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
