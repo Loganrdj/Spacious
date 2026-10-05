@@ -20,6 +20,8 @@ final class AppModel {
     private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
     /// Short status line shown in the menu after applying a layout.
     var statusMessage: String?
+    /// True while a layout is being applied (browser tabs take a moment).
+    private(set) var isApplying = false
 
     @ObservationIgnored let displayManager = DisplayManager()
     @ObservationIgnored private(set) lazy var overlay = SnapOverlayController(model: self)
@@ -302,8 +304,15 @@ final class AppModel {
             statusMessage = "Allow Accessibility access first."
             return
         }
-        let result = LayoutApplier.apply(activeLayout, model: self)
-        statusMessage = result.summary
+        guard !isApplying else { return }
+        isApplying = true
+        statusMessage = "Arranging…"
+        let layout = activeLayout
+        Task {
+            let result = await LayoutApplier.apply(layout, model: self)
+            statusMessage = result.summary
+            isApplying = false
+        }
     }
 
     func snapFocusedWindow() {

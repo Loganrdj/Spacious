@@ -197,3 +197,41 @@ final class ZoneFittingTests: XCTestCase {
         XCTAssertEqual(doc.layouts.first?.name, "Default")
     }
 }
+
+final class TargetMatchingTests: XCTestCase {
+    func testURLMatchingIgnoresSchemeWWWAndTrailingSlash() {
+        XCTAssertTrue(TargetMatching.url("https://mail.google.com/mail/u/0/#inbox", matches: "mail.google.com"))
+        XCTAssertTrue(TargetMatching.url("https://www.github.com/", matches: "https://GitHub.com"))
+        XCTAssertTrue(TargetMatching.url("https://www.youtube.com/watch?v=abc", matches: "youtube.com/watch"))
+    }
+
+    func testURLMatchingRespectsBoundaries() {
+        XCTAssertFalse(TargetMatching.url("https://github.community/t/1", matches: "github.com"))
+        XCTAssertFalse(TargetMatching.url("https://docs.google.com/document/d/1", matches: "docs.google.com/spreadsheets"))
+        XCTAssertFalse(TargetMatching.url("https://example.com", matches: ""))
+    }
+
+    func testSuggestedPatternDropsQueryAndFragment() {
+        XCTAssertEqual(TargetMatching.suggestedPattern(for: "https://www.youtube.com/watch?v=abc#t=10"), "youtube.com/watch")
+        XCTAssertEqual(TargetMatching.suggestedPattern(for: "https://mail.google.com/mail/u/0/#inbox"), "mail.google.com/mail/u/0")
+    }
+
+    func testOpenableURLAddsScheme() {
+        XCTAssertEqual(TargetMatching.openableURL(for: "mail.google.com")?.absoluteString, "https://mail.google.com")
+        XCTAssertEqual(TargetMatching.openableURL(for: "http://localhost:3000")?.absoluteString, "http://localhost:3000")
+    }
+
+    func testTitleMatchingIsCaseInsensitiveContains() {
+        XCTAssertTrue(TargetMatching.title("Project Board – Notion", matches: "project board"))
+        XCTAssertFalse(TargetMatching.title("Project Board", matches: "  "))
+    }
+
+    func testTargetKindsAndLegacyDecoding() throws {
+        let legacy = try JSONDecoder().decode(AppRef.self, from: Data(#"{"bundleID":"com.google.Chrome","name":"Google Chrome"}"#.utf8))
+        XCTAssertEqual(legacy.kind, .app)
+        let site = AppRef(bundleID: "com.google.Chrome", name: "Google Chrome", url: "mail.google.com")
+        XCTAssertEqual(site.kind, .website(url: "mail.google.com"))
+        XCTAssertNotEqual(site.id, legacy.id)
+        XCTAssertEqual(AppRef(bundleID: "a", name: "Notes", windowTitle: "Groceries").label, "Notes: “Groceries”")
+    }
+}

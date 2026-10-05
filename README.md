@@ -10,7 +10,11 @@ The app runs entirely on your Mac, with no accounts, no backend, and no network.
 
 - **Monitor map**: shows your displays in their actual physical arrangement. Click one to edit it.
 - **A custom grid for each monitor**: up to 48×48. Choose a quick layout (halves, thirds, quarters, and so on) or draw your own zones on a fine grid.
-- **Assign apps to zones**: pick from running apps or anything in /Applications. If an app is assigned to several zones, its windows are spread across them.
+- **Assign apps, windows, or websites to zones**:
+  - **App**: all of its windows. If an app is assigned to several zones, its windows are spread across them.
+  - **Window**: one specific window, matched by its title (for example, a Notes window titled "Groceries").
+  - **Website**: a browser tab such as `mail.google.com`. On Apply, Spacious moves the tab into a window of its own, keeping the page intact, and places that window. If the site isn't open, Spacious opens it. Works with Chrome, Safari, Edge, Brave, and Vivaldi. Firefox doesn't let other apps read its tabs.
+- **Minimum window sizes**: some apps (Spotify, for example) can't shrink below a certain size. Spacious measures this, marks zones that are too small with ⚠︎, and offers *Grow zone to fit*.
 - **Multiple layouts**: for example "Coding" and "Meeting". Switch and apply from the menu or with a hotkey.
 - **Snap any window**: press <kbd>⌃⌥Space</kbd>, then click a zone or drag across cells.
 - **Shift-drag**: hold <kbd>Shift</kbd> while dragging a window to see the zones, then drop it into one.
@@ -22,6 +26,8 @@ The app runs entirely on your Mac, with no accounts, no backend, and no network.
 Download the latest `Spacious-x.y.z.dmg` from [Releases](https://github.com/Loganrdj/Spacious/releases), drag Spacious to Applications, and open it.
 
 On first launch, macOS asks you to allow **Accessibility** access (System Settings → Privacy & Security → Accessibility). Spacious needs it to move other apps' windows.
+
+The first time you assign a website, macOS asks whether Spacious may control your browser (**Automation**). Spacious uses that only to read tab addresses and move the tabs you assigned.
 
 ## Build from source
 

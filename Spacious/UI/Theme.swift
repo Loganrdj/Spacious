@@ -36,6 +36,26 @@ enum AppCatalog {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    struct WindowChoice: Identifiable, Hashable {
+        let bundleID: String
+        let appName: String
+        let title: String
+        var id: String { "\(bundleID)|\(title)" }
+    }
+
+    /// Titled windows of all regular running apps, grouped by app.
+    static func openWindows() -> [WindowChoice] {
+        runningApps().flatMap { app in
+            NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).flatMap { running in
+                AccessibilityService.windows(of: running.processIdentifier, includeFullScreen: true)
+                    .map(AccessibilityService.title(of:))
+                    .filter { !$0.isEmpty }
+                    .map { WindowChoice(bundleID: app.bundleID, appName: app.name, title: $0) }
+            }
+        }
+        .reduce(into: [WindowChoice]()) { if !$0.contains($1) { $0.append($1) } }
+    }
+
     /// A small icon for an app, cached.
     static func icon(for bundleID: String, size: CGFloat = 16) -> NSImage {
         let key = "\(bundleID)@\(size)"

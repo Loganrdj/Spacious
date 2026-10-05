@@ -157,7 +157,7 @@ struct MenuPopoverView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(!model.isAccessibilityTrusted)
+            .disabled(!model.isAccessibilityTrusted || model.isApplying)
 
             if let message = model.statusMessage {
                 Text(message)

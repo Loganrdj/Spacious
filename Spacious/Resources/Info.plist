@@ -24,6 +24,8 @@
 	<string>public.app-category.productivity</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Spacious reads your open browser tabs so you can give a website its own zone, and moves those tabs into their own windows.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Logan Moss. MIT License.</string>
 </dict>

@@ -73,15 +73,45 @@ public struct Size2D: Codable, Hashable, Sendable {
     public static let zero = Size2D(width: 0, height: 0)
 }
 
-/// An application assigned to a zone, identified by bundle ID.
+/// Something assigned to a zone: a whole app, one of its windows (matched by
+/// title), or a browser tab (matched by URL). `bundleID` is always the app
+/// that owns the window — for websites, the browser.
 public struct AppRef: Codable, Hashable, Identifiable, Sendable {
     public var bundleID: String
     public var name: String
-    public var id: String { bundleID }
+    /// When set, only a window whose title contains this text.
+    public var windowTitle: String?
+    /// When set, a browser tab whose URL starts with this (see `TargetMatching`).
+    public var url: String?
 
-    public init(bundleID: String, name: String) {
+    public init(bundleID: String, name: String, windowTitle: String? = nil, url: String? = nil) {
         self.bundleID = bundleID
         self.name = name
+        self.windowTitle = windowTitle
+        self.url = url
+    }
+
+    public enum Kind: Equatable, Sendable {
+        case app
+        case window(title: String)
+        case website(url: String)
+    }
+
+    public var kind: Kind {
+        if let url { return .website(url: url) }
+        if let windowTitle { return .window(title: windowTitle) }
+        return .app
+    }
+
+    public var id: String { "\(bundleID)|\(windowTitle ?? "")|\(url ?? "")" }
+
+    /// Short label for zone tiles and summaries.
+    public var label: String {
+        switch kind {
+        case .app: name
+        case .window(let title): "\(name): “\(title)”"
+        case .website(let url): url
+        }
     }
 }
 
@@ -108,7 +138,7 @@ public struct Zone: Codable, Hashable, Identifiable, Sendable {
     /// A human label: the zone name, or the assigned apps when unnamed.
     public var displayName: String {
         if !name.isEmpty { return name }
-        if !apps.isEmpty { return apps.map(\.name).joined(separator: ", ") }
+        if !apps.isEmpty { return apps.map(\.label).joined(separator: ", ") }
         return "Untitled zone"
     }
 }

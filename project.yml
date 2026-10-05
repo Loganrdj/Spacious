@@ -38,9 +38,11 @@ targets:
         LSUIElement: true
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: Copyright © 2026 Logan Moss. MIT License.
+        NSAppleEventsUsageDescription: Spacious reads your open browser tabs so you can give a website its own zone, and moves those tabs into their own windows.
     entitlements:
       path: Spacious/Resources/Spacious.entitlements
-      properties: {}
+      properties:
+        com.apple.security.automation.apple-events: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.loganrdj.spacious

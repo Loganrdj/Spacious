@@ -36,21 +36,61 @@ enum AccessibilityService {
         return attribute(appElement, kAXMainWindowAttribute)
     }
 
-    /// Standard windows of a process that can be arranged (not minimized or
-    /// full screen), front-most first.
-    static func windows(of pid: pid_t) -> [AXUIElement] {
+    /// Standard, non-minimized windows of a process, front-most first.
+    /// Full-screen windows can't be moved, so they're left out unless
+    /// `includeFullScreen` (see `exitFullScreen`).
+    static func windows(of pid: pid_t, includeFullScreen: Bool = false) -> [AXUIElement] {
         let appElement = AXUIElementCreateApplication(pid)
         let all: [AXUIElement] = attribute(appElement, kAXWindowsAttribute) ?? []
         return all.filter { window in
             let subrole: String? = attribute(window, kAXSubroleAttribute)
             let minimized: Bool = attribute(window, kAXMinimizedAttribute) ?? false
-            let fullScreen: Bool = attribute(window, "AXFullScreen") ?? false
-            guard !minimized, !fullScreen else { return false }
+            guard !minimized, includeFullScreen || !isFullScreen(window) else { return false }
             if subrole == kAXStandardWindowSubrole { return true }
             // Some apps don't report a subrole for real windows, but Finder's
             // desktop doesn't either; only accept those if they can be resized.
             return subrole == nil && isResizable(window)
         }
+    }
+
+    static func isFullScreen(_ window: AXUIElement) -> Bool {
+        attribute(window, "AXFullScreen") ?? false
+    }
+
+    /// Takes a window out of full screen and waits for the animation, so it
+    /// can be arranged. No-op for windows that aren't full screen.
+    @MainActor
+    static func exitFullScreen(_ window: AXUIElement) async {
+        guard isFullScreen(window) else { return }
+        AXUIElementSetAttributeValue(window, "AXFullScreen" as CFString, kCFBooleanFalse)
+        for _ in 0..<20 where isFullScreen(window) {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        try? await Task.sleep(for: .milliseconds(400)) // let the exit animation settle
+    }
+
+    static func title(of window: AXUIElement) -> String {
+        attribute(window, kAXTitleAttribute) ?? ""
+    }
+
+    /// Presses an app's menu item by its title (e.g. Chrome's "Move Tab to
+    /// New Window"). Works while the app is in the background. Returns false
+    /// if the item doesn't exist or is disabled.
+    @discardableResult
+    static func pressMenuItem(titled title: String, in pid: pid_t) -> Bool {
+        let app = AXUIElementCreateApplication(pid)
+        guard let menuBar: AXUIElement = attribute(app, kAXMenuBarAttribute) else { return false }
+        func find(_ element: AXUIElement, depth: Int) -> AXUIElement? {
+            if self.title(of: element) == title { return element }
+            guard depth < 4 else { return nil }
+            let children: [AXUIElement] = attribute(element, kAXChildrenAttribute) ?? []
+            for child in children {
+                if let found = find(child, depth: depth + 1) { return found }
+            }
+            return nil
+        }
+        guard let item = find(menuBar, depth: 0), attribute(item, kAXEnabledAttribute) ?? false else { return false }
+        return AXUIElementPerformAction(item, kAXPressAction as CFString) == .success
     }
 
     /// The top-level window under an AX-space point, e.g. under the cursor.
