@@ -4,7 +4,9 @@
 #   scripts/release.sh [version]
 #
 # With Developer ID credentials in the environment, the app and DMG are signed
-# and notarized. Without them, an ad-hoc signed DMG is produced for testing.
+# and notarized. Without them, the app is signed with an "Apple Development"
+# certificate from the keychain if there is one (not notarized, but macOS
+# keeps permissions like Accessibility across updates), else ad-hoc.
 #
 #   DEVELOPER_ID_IDENTITY  e.g. "Developer ID Application: Logan Moss (434QVQFFXL)"
 #   APPLE_TEAM_ID          e.g. 434QVQFFXL
@@ -28,8 +30,13 @@ SIGNED=0
 if [[ -n "${DEVELOPER_ID_IDENTITY:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
   SIGNED=1
   SIGN_ARGS=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=$DEVELOPER_ID_IDENTITY" "DEVELOPMENT_TEAM=$APPLE_TEAM_ID" "OTHER_CODE_SIGN_FLAGS=--timestamp")
+elif DEV_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 '"Apple Development' | sed -E 's/.*"(.*)"/\1/') && [[ -n "$DEV_IDENTITY" ]]; then
+  # Team ID is the certificate's organizational unit.
+  DEV_TEAM=$(security find-certificate -c "$DEV_IDENTITY" -p | openssl x509 -noout -subject | sed -E 's/.*OU ?= ?([A-Z0-9]+).*/\1/')
+  echo "⚠️  No Developer ID credentials. Signing with \"$DEV_IDENTITY\" (not notarized)."
+  SIGN_ARGS=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=$DEV_IDENTITY" "DEVELOPMENT_TEAM=$DEV_TEAM" "OTHER_CODE_SIGN_FLAGS=--timestamp")
 else
-  echo "⚠️  No Developer ID credentials. Building an ad-hoc signed, un-notarized DMG."
+  echo "⚠️  No signing certificate found. Building an ad-hoc signed, un-notarized DMG."
   SIGN_ARGS=(CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual)
 fi
 

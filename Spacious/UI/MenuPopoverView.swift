@@ -22,7 +22,9 @@ struct MenuPopoverView: View {
                 if showingSettings {
                     SettingsView(model: model)
                 } else {
-                    if !model.isAccessibilityTrusted {
+                    if InstallLocation.needsMove {
+                        MoveToApplicationsBanner()
+                    } else if !model.isAccessibilityTrusted {
                         PermissionBanner(model: model)
                     }
                     editor
