@@ -195,6 +195,8 @@ final class ZoneFittingTests: XCTestCase {
         let doc = try JSONDecoder().decode(SpaciousDocument.self, from: Data(legacy.utf8))
         XCTAssertEqual(doc.appMinimumSizes, [:])
         XCTAssertEqual(doc.layouts.first?.name, "Default")
+        XCTAssertEqual(doc.settings.startupAction, .nothing)
+        XCTAssertEqual(doc.settings.gap, 8)
     }
 }
 

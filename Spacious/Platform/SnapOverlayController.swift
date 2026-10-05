@@ -60,8 +60,10 @@ final class SnapOverlayController {
             return hide()
         }
         hide()
-        model.place(window, cells: cells, in: grid, on: display)
         AccessibilityService.raise(window)
+        Task { [model] in
+            await model.arrange(WindowMove(window: window, cells: cells, grid: grid, display: display))
+        }
     }
 
     // MARK: Shift-drag

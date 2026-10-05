@@ -53,6 +53,18 @@ final class AppModel {
             }
             startTrustPolling()
         }
+        runStartupAction()
+    }
+
+    /// Arranges or launches everything when Spacious starts, e.g. at login.
+    private func runStartupAction() {
+        let action = document.settings.startupAction
+        guard action != .nothing, isAccessibilityTrusted else { return }
+        Task {
+            // Give the system (and other login items) a moment to settle.
+            try? await Task.sleep(for: .seconds(3))
+            applyActiveLayout(launchMissing: action == .launchAll)
+        }
     }
 
     // MARK: Accessibility
@@ -253,13 +265,38 @@ final class AppModel {
             learnMinimumSize(bundleID, requested: target.size, actual: actual.size)
         }
 
-        let bounds = Coordinates.flip(display.visibleFrame, primaryScreenHeight: DisplayManager.primaryScreenHeight)
-            .insetBy(dx: gap / 2, dy: gap / 2)
-        let placed = ZoneFitting.place(windowSize: actual.size, in: target, bounds: bounds)
+        let placed = ZoneFitting.place(windowSize: actual.size, in: target, bounds: axBounds(of: display))
         if abs(placed.minX - actual.minX) > 1 || abs(placed.minY - actual.minY) > 1 {
             AccessibilityService.setPosition(placed.origin, of: window)
         }
         return actual.width <= target.width + ZoneFitting.tolerance && actual.height <= target.height + ZoneFitting.tolerance
+    }
+
+    /// Moves a window into its zone, gliding it there when animation is on.
+    /// Returns whether the window fit its zone.
+    @discardableResult
+    func arrange(_ move: WindowMove) async -> Bool {
+        AXUIElementPerformAction(move.window, kAXRaiseAction as CFString)
+        await WindowAnimator.animate(move.window, to: predictedFrame(for: move), duration: document.settings.animationDuration)
+        // Final, exact placement (also learns minimum sizes).
+        return place(move.window, cells: move.cells, in: move.grid, on: move.display)
+    }
+
+    /// Where a window will really end up: its zone, or, if the app is known
+    /// to need more room, centered on the zone at its minimum size. Aiming
+    /// the animation there avoids a jump at the end.
+    private func predictedFrame(for move: WindowMove) -> CGRect {
+        let target = axFrame(for: move.cells, in: move.grid, on: move.display)
+        guard let bundleID = bundleID(of: move.window), let minimum = minimumSize(of: bundleID) else { return target }
+        let size = CGSize(width: max(target.width, minimum.width), height: max(target.height, minimum.height))
+        guard size != target.size else { return target }
+        return ZoneFitting.place(windowSize: size, in: target, bounds: axBounds(of: move.display))
+    }
+
+    /// A display's usable area in AX coordinates, inset by the outer gap.
+    private func axBounds(of display: DisplayInfo) -> CGRect {
+        Coordinates.flip(display.visibleFrame, primaryScreenHeight: DisplayManager.primaryScreenHeight)
+            .insetBy(dx: gap / 2, dy: gap / 2)
     }
 
     private func bundleID(of window: AXUIElement) -> String? {
@@ -299,17 +336,25 @@ final class AppModel {
 
     // MARK: Actions
 
-    func applyActiveLayout() {
+    /// Opens every assigned app and website that isn't open, then arranges.
+    func launchAll() {
+        applyActiveLayout(launchMissing: true)
+    }
+
+    /// Arranges the active layout. `launchMissing` defaults to the layout's
+    /// "open assigned apps that aren't running" setting.
+    func applyActiveLayout(launchMissing: Bool? = nil) {
         guard isAccessibilityTrusted else {
             statusMessage = "Allow Accessibility access first."
             return
         }
         guard !isApplying else { return }
         isApplying = true
-        statusMessage = "Arranging…"
         let layout = activeLayout
+        let launch = launchMissing ?? layout.launchMissingApps
+        statusMessage = launch ? "Opening apps and websites…" : "Arranging…"
         Task {
-            let result = await LayoutApplier.apply(layout, model: self)
+            let result = await LayoutApplier.apply(layout, model: self, launchMissing: launch)
             statusMessage = result.summary
             isApplying = false
         }
@@ -354,4 +399,12 @@ final class AppModel {
         saveTask?.cancel()
         try? store.save(document)
     }
+}
+
+/// A window and the zone it should move into.
+struct WindowMove {
+    let window: AXUIElement
+    let cells: CellRect
+    let grid: MonitorGrid
+    let display: DisplayInfo
 }

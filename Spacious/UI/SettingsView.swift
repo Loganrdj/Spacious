@@ -15,15 +15,47 @@ struct SettingsView: View {
                 }
                 Slider(value: $model.document.settings.gap, in: 0...32, step: 2)
                 Toggle("Hold Shift while dragging a window to snap it into a zone", isOn: $model.document.settings.shiftDragEnabled)
+                HStack {
+                    Text("Window animation")
+                    Spacer()
+                    Picker("Window animation", selection: $model.document.settings.animationDuration) {
+                        Text("Off").tag(0.0)
+                        Text("Quick").tag(0.2)
+                        Text("Smooth").tag(0.35)
+                        Text("Relaxed").tag(0.6)
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+
+            group("When Spacious opens") {
+                Picker("When Spacious opens", selection: $model.document.settings.startupAction) {
+                    Text("Do nothing").tag(StartupAction.nothing)
+                    Text("Arrange open windows").tag(StartupAction.arrange)
+                    Text("Launch all apps & websites, then arrange").tag(StartupAction.launchAll)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                if model.document.settings.startupAction != .nothing && !model.launchAtLogin {
+                    HStack {
+                        Text("Also open Spacious at login to set up your Mac automatically after a restart.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Turn On") { model.setLaunchAtLogin(true) }
+                    }
+                }
             }
 
             group("Layout “\(model.activeLayout.name)”") {
-                Toggle("Open assigned apps that aren't running when applying", isOn: $model.activeLayout.launchMissingApps)
+                Toggle("Arrange also opens apps and websites that aren't open", isOn: $model.activeLayout.launchMissingApps)
             }
 
             group("Keyboard shortcuts") {
                 shortcutRow("Snap focused window", .snapFocusedWindow)
-                shortcutRow("Apply layout", .applyLayout)
+                shortcutRow("Arrange", .applyLayout)
+                shortcutRow("Launch all", .launchAll)
                 shortcutRow("Next layout", .nextLayout)
             }
 

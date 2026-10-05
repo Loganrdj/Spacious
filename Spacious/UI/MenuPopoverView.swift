@@ -143,19 +143,34 @@ struct MenuPopoverView: View {
 
     private var footer: some View {
         VStack(spacing: 8) {
-            Button {
-                model.applyActiveLayout()
-            } label: {
-                HStack {
-                    Image(systemName: "rectangle.3.group")
-                    Text("Apply “\(model.activeLayout.name)”")
-                    if let shortcut = KeyboardShortcuts.getShortcut(for: .applyLayout) {
-                        Text(shortcut.description).foregroundStyle(.white.opacity(0.7))
+            HStack(spacing: 8) {
+                Button {
+                    model.applyActiveLayout()
+                } label: {
+                    HStack {
+                        Image(systemName: "rectangle.3.group")
+                        Text("Arrange")
+                        if let shortcut = KeyboardShortcuts.getShortcut(for: .applyLayout) {
+                            Text(shortcut.description).foregroundStyle(.white.opacity(0.7))
+                        }
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .help("Move open windows into “\(model.activeLayout.name)”")
+
+                Button {
+                    model.launchAll()
+                } label: {
+                    HStack {
+                        Image(systemName: "power")
+                        Text("Launch All")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .help("Open every app and website in “\(model.activeLayout.name)”, then arrange them")
             }
-            .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(!model.isAccessibilityTrusted || model.isApplying)
 

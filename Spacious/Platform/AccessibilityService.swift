@@ -47,9 +47,10 @@ enum AccessibilityService {
             let minimized: Bool = attribute(window, kAXMinimizedAttribute) ?? false
             guard !minimized, includeFullScreen || !isFullScreen(window) else { return false }
             if subrole == kAXStandardWindowSubrole { return true }
-            // Some apps don't report a subrole for real windows, but Finder's
-            // desktop doesn't either; only accept those if they can be resized.
-            return subrole == nil && isResizable(window)
+            // Some real windows report no subrole, or "dialog" (e.g. TextEdit
+            // documents on recent macOS). Finder's desktop and genuine alerts
+            // look the same but can't be resized, so require that.
+            return (subrole == nil || subrole == kAXDialogSubrole) && isResizable(window)
         }
     }
 
@@ -161,6 +162,26 @@ enum AccessibilityService {
             writePosition(original.origin, of: window)
             return measured
         }
+    }
+
+    /// One animation frame: size then position, without the enhanced-UI
+    /// toggling `setFrame` does (the animator handles that once per app).
+    static func setFrameForAnimation(_ rect: CGRect, of window: AXUIElement) {
+        writeSize(rect.size, of: window)
+        writePosition(rect.origin, of: window)
+    }
+
+    /// Turns an app's "enhanced UI" off and returns whether it was on, so it
+    /// can be restored with `restoreEnhancedUI`.
+    static func disableEnhancedUI(for pid: pid_t) -> Bool {
+        let app = AXUIElementCreateApplication(pid)
+        guard let enabled: Bool = attribute(app, "AXEnhancedUserInterface"), enabled else { return false }
+        AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanFalse)
+        return true
+    }
+
+    static func restoreEnhancedUI(for pid: pid_t) {
+        AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
 
     /// Apps using "enhanced UI" (Chrome, Electron) animate AX changes, which

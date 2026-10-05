@@ -58,7 +58,7 @@ final class DragSnapMonitor {
                 // Give the system a moment to finish its own drag before resizing.
                 Task { @MainActor [model] in
                     try? await Task.sleep(for: .milliseconds(60))
-                    model.place(window, cells: target.zone.cells, in: target.grid, on: target.display)
+                    await model.arrange(WindowMove(window: window, cells: target.zone.cells, grid: target.grid, display: target.display))
                 }
             }
             if model.overlay.isVisible && !model.overlay.state.interactive { model.overlay.hide() }
